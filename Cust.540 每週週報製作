@@ -1,0 +1,496 @@
+# 引入必要的模組
+import os
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import Select
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+import warnings
+import datetime
+import time
+import shutil
+import glob
+import isoweek
+import openpyxl
+from openpyxl.utils import column_index_from_string
+from openpyxl import load_workbook
+import xlwings as xw
+import re
+
+# 忽略 openpyxl 的警告訊息
+warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
+
+url = "http://tstpas/TPAS/index.jsp"
+user_id = "A005772"
+user_pw = "A66666666666"
+
+# 創建 WebDriver 實例 (以 Chrome 爲例)
+s = Service("path/to/chromedriver")
+driver = webdriver.Chrome(service=s)
+
+# 打開網站
+driver.get(url)
+
+# 等待 mainFrame 加載完成
+wait = WebDriverWait(driver, 10)
+wait.until(EC.frame_to_be_available_and_switch_to_it((By.NAME, "mainFrame")))
+
+# 定位 User ID 和 User PW 輸入框 (根據網頁元素的name等定位)
+user_id_input = driver.find_element(By.NAME, "userid")
+user_pw_input = driver.find_element(By.NAME, "password")
+
+# 輸入 User ID 和 User PW
+user_id_input.send_keys(user_id)
+user_pw_input.send_keys(user_pw)
+
+# 提交登錄表單
+login_form = driver.find_element(By.NAME, "form1")
+login_form.submit()
+
+# 如果需要, 切換回主窗口
+driver.switch_to.default_content()
+
+# 切換到包含 'TPAS MFG Utility' 的 frame
+frame = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//frame[@src="/TPAS/edu/edu_menu.jsp"]')))
+driver.switch_to.frame(frame)
+
+# 點擊 'MFG Utility' 鏈接
+xpath = '//a[@id="ygtvlabelel115"]'
+element_to_click = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, xpath)))
+element_to_click.click()
+
+# 點擊 'MFG Use' 鏈接
+xpath = '//a[@id="ygtvlabelel192"]'
+element_to_click = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, xpath)))
+element_to_click.click()
+
+# 點擊 'Process Output' 鏈接
+xpath = '//a[@id="ygtvlabelel207"]'
+element_to_click = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, xpath)))
+element_to_click.click()
+
+# 將焦點切換回父框架
+driver.switch_to.parent_frame()
+
+# 切換到包含 'AVI Inspection Report' 的 frame
+frame = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//frame[@src="/TPAS/edu/edu_main.jsp"]')))
+driver.switch_to.frame(frame)
+
+# 定位並選擇 "540" 選項
+select_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//select[@name="customer_id" and option[@value="540"]]')))
+select = Select(select_element)
+
+# 取消當前默認選項的選擇狀態
+selected_option = select.first_selected_option
+if selected_option.get_attribute("value") != "540":
+    selected_option.click()
+
+# 選擇 "540" 選項
+select.select_by_value("540")
+
+# 定位並選擇"IQC" 選項
+select_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "pd_name")))
+select = Select(select_element)
+select.select_by_visible_text("IQC")
+
+# 計算上上週的週六的日期
+today = datetime.date.today()
+days_to_subtract = (today.weekday() - 5) % 7
+two_weeks_ago_saturday = today - datetime.timedelta(days=days_to_subtract + 7)
+two_weeks_ago_saturday_str = two_weeks_ago_saturday.strftime("%Y-%m-%d")
+
+#找到名爲 "begin_date" 的輸入框並設置新的日期值
+begin_date_input = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.NAME, "begin_date")))
+begin_date_input.clear()
+begin_date_input.send_keys(two_weeks_ago_saturday_str)
+
+# 計算上週的週六
+days_to_last_saturday = (today.weekday() - 5) % 7
+last_week_saturday = today - datetime.timedelta(days=days_to_last_saturday)
+last_week_saturday_str = last_week_saturday.strftime("%Y-%m-%d")
+
+# 找到名爲 "end_date" 的輸入框並設置新的日期值
+end_date_input = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.NAME, "end_date")))
+end_date_input.clear()
+end_date_input.send_keys(last_week_saturday_str)
+
+# 找到名爲 "Image29" 的按鈕並點擊
+submit_button = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.NAME, "Image29")))
+submit_button.click()
+
+# 暫停 10 秒以觀察網頁操作
+time.sleep(10)
+
+# 找到excel下載視窗並點擊
+submit_button = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "//img[@name='Image13'][@src='/ArdentecW/image/icon_excel.gif']")))
+submit_button.click()
+
+# 暫停 5 秒以觀察網頁操作
+time.sleep(5)
+
+# 指定下載文件夾
+download_folder = r"C:\Users\A005772\Downloads"
+
+# 獲取下載文件夾中的最新文件
+list_of_files = glob.glob(download_folder + r'\*')
+latest_file = max(list_of_files, key=os.path.getctime)
+
+# 構建新文件名
+new_file_name = "540 IQC output(供月報使用).xlsx"
+
+# 將下載的文件重命名
+renamed_file_path = os.path.join(download_folder, new_file_name)
+shutil.move(latest_file, renamed_file_path)
+
+# 將重命名後的文件移動到桌面路徑
+destination_folder = r"H:\資料備份區\自動化下載資料暫存區"
+shutil.move(renamed_file_path, os.path.join(destination_folder, new_file_name))
+
+# 找到excel下載視窗並點擊
+submit_button = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "//img[@name='Image13'][@src='/ArdentecW/image/icon_back.gif']")))
+submit_button.click()
+
+# 將焦點切換回父框架
+driver.switch_to.parent_frame()
+
+# 切換到包含 'AVI Inspection Report' 的 frame
+frame = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//frame[@src="/TPAS/edu/edu_main.jsp"]')))
+driver.switch_to.frame(frame)
+
+# 定位並選擇 "540" 選項
+select_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//select[@name="customer_id" and option[@value="540"]]')))
+select = Select(select_element)
+
+# 取消當前默認選項的選擇狀態
+selected_option = select.first_selected_option
+if selected_option.get_attribute("value") != "540":
+    selected_option.click()
+
+# 選擇 "540" 選項
+select.select_by_value("540")
+
+# 定位並選擇"AVI" 選項
+select_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//select[@name="pd_name" and option[@value="AVI"]]')))
+select = Select(select_element)
+
+# 取消當前默認選項的選擇狀態
+selected_option = select.first_selected_option
+if selected_option.get_attribute("value") != "AVI":
+    selected_option.click()
+
+# 選擇 "AVI" 選項
+select.select_by_value("AVI")
+
+# 計算上上週的週六的日期
+today = datetime.date.today()
+days_to_subtract = (today.weekday() - 5) % 7
+two_weeks_ago_saturday = today - datetime.timedelta(days=days_to_subtract + 7)
+two_weeks_ago_saturday_str = two_weeks_ago_saturday.strftime("%Y-%m-%d")
+
+#找到名爲 "begin_date" 的輸入框並設置新的日期值
+begin_date_input = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.NAME, "begin_date")))
+begin_date_input.clear()
+begin_date_input.send_keys(two_weeks_ago_saturday_str)
+
+# 計算上週的週六
+days_to_last_saturday = (today.weekday() - 5) % 7
+last_week_saturday = today - datetime.timedelta(days=days_to_last_saturday)
+last_week_saturday_str = last_week_saturday.strftime("%Y-%m-%d")
+
+# 找到名爲 "end_date" 的輸入框並設置新的日期值
+end_date_input = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.NAME, "end_date")))
+end_date_input.clear()
+end_date_input.send_keys(last_week_saturday_str)
+
+# 找到名爲 "Image29" 的按鈕並點擊
+submit_button = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.NAME, "Image29")))
+submit_button.click()
+
+# 暫停 10 秒以觀察網頁操作
+time.sleep(10)
+
+# 找到excel下載視窗並點擊
+submit_button = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, "//img[@name='Image13'][@src='/ArdentecW/image/icon_excel.gif']")))
+submit_button.click()
+
+# 暫停 5 秒以觀察網頁操作
+time.sleep(5)
+
+# 指定下載文件夾
+download_folder = r"C:\Users\A005772\Downloads"
+
+# 獲取下載文件夾中的最新文件
+list_of_files = glob.glob(download_folder + r'\*')
+latest_file = max(list_of_files, key=os.path.getctime)
+
+# 構建新文件名
+new_file_name = "540 AVI output(供月報使用).xlsx"
+
+# 將下載的文件重命名
+renamed_file_path = os.path.join(download_folder, new_file_name)
+shutil.move(latest_file, renamed_file_path)
+
+# 將重命名後的文件移動到桌面路徑
+destination_folder = r"H:\資料備份區\自動化下載資料暫存區"
+shutil.move(renamed_file_path, os.path.join(destination_folder, new_file_name))
+
+# 最後，關閉瀏覽器
+driver.quit()
+
+# 指定文件路徑和文件名
+folder_path = r"H:\資料備份區\自動化下載資料暫存區"
+file_name = "540 IQC output(供月報使用).xlsx"
+file_path = os.path.join(folder_path, file_name)
+
+# 打開工作簿
+workbook = openpyxl.load_workbook(file_path)
+worksheet = workbook.active
+sheet = workbook.active
+
+# 遍歷整個工作表的所有單元格
+for row in range(1, sheet.max_row + 1):
+    for col in range(1, sheet.max_column + 1):
+        cell = sheet.cell(row=row, column=col)
+        
+        # 檢查單元格是否是合併儲存格
+        is_merged = any(cell.coordinate in merged_cell for merged_cell in sheet.merged_cells)
+        
+        # 如果單元格是合併儲存格，解除合併
+        if is_merged:
+            for merged_cell_range in sheet.merged_cells:
+                if cell.coordinate in merged_cell_range:
+                    sheet.unmerge_cells(str(merged_cell_range))
+                    break
+
+# 獲取 A 列的列索引
+column_index = column_index_from_string('A')
+rows_to_delete = []
+
+# 從A3列開始遍歷 A 列的所有單元格
+starting_row = 3
+for row in range(starting_row, sheet.max_row + 1):
+    cell_value = sheet.cell(row=row, column=column_index).value
+    # 如果值可以轉換為整數，進行轉換
+    try:
+        cell_value = int(cell_value)
+    except (ValueError, TypeError):
+        pass
+    # 檢查單元格值是否為整數，並在範圍 1 到 9999 之內
+    if not (isinstance(cell_value, int) and 1 <= cell_value <= 9999):
+        rows_to_delete.append(row)
+
+# 逆序刪除行，避免因行索引改變而導致的錯誤
+for row in sorted(rows_to_delete, reverse=True):
+    sheet.delete_rows(row)
+
+# 保存修改後的工作簿
+workbook.save(file_path)
+
+print("已成功修改540 IQC output(供月報使用)檔案!")
+
+# 指定文件路徑和文件名
+folder_path = r"H:\資料備份區\自動化下載資料暫存區"
+file_name = "540 AVI output(供月報使用).xlsx"
+file_path = os.path.join(folder_path, file_name)
+
+# 打開工作簿
+workbook = openpyxl.load_workbook(file_path)
+worksheet = workbook.active
+sheet = workbook.active
+
+# 遍歷整個工作表的所有單元格
+for row in range(1, sheet.max_row + 1):
+    for col in range(1, sheet.max_column + 1):
+        cell = sheet.cell(row=row, column=col)
+        
+        # 檢查單元格是否是合併儲存格
+        is_merged = any(cell.coordinate in merged_cell for merged_cell in sheet.merged_cells)
+        
+        # 如果單元格是合併儲存格，解除合併
+        if is_merged:
+            for merged_cell_range in sheet.merged_cells:
+                if cell.coordinate in merged_cell_range:
+                    sheet.unmerge_cells(str(merged_cell_range))
+                    break
+
+# 獲取 A 列的列索引
+column_index = column_index_from_string('A')
+rows_to_delete = []
+
+# 從A3列開始遍歷 A 列的所有單元格
+starting_row = 3
+for row in range(starting_row, sheet.max_row + 1):
+    cell_value = sheet.cell(row=row, column=column_index).value
+    # 如果值可以轉換為整數，進行轉換
+    try:
+        cell_value = int(cell_value)
+    except (ValueError, TypeError):
+        pass
+    # 檢查單元格值是否為整數，並在範圍 1 到 9999 之內
+    if not (isinstance(cell_value, int) and 1 <= cell_value <= 9999):
+        rows_to_delete.append(row)
+
+# 逆序刪除行，避免因行索引改變而導致的錯誤
+for row in sorted(rows_to_delete, reverse=True):
+    sheet.delete_rows(row)
+
+# 保存修改後的工作簿
+workbook.save(file_path)
+
+print("已成功修改540 AVI output(供月報使用)檔案!")
+
+# 設置路徑
+folder_path = r"M:\QAReport\00 Customer report\396 IFX"
+
+# 獲取當前年份
+current_year = datetime.datetime.now().year
+
+# 搜索符合條件的文件夾
+target_folder = None
+for folder_name in os.listdir(folder_path):
+    if f"{current_year} IFX weekly report" in folder_name:
+        target_folder = os.path.join(folder_path, folder_name)
+        break
+
+# 檢查是否找到符合條件的文件夾
+if target_folder:
+    print(f"找到了 {current_year} IFX weekly report 文件夾：{target_folder}")
+else:
+    print("請檢查資料夾中是否有正確年份的IFX weekly report資料夾")
+
+# 獲取當前日期所在的周
+now = datetime.datetime.now()
+current_year = now.year
+current_week = isoweek.Week.withdate(now).week
+week_str = f"{str(current_year)[-2:]}W{current_week:02d}"
+
+# 獲取當前周的開始和結束日期
+current_week_start = now - datetime.timedelta(days=now.weekday())
+current_week_end = current_week_start + datetime.timedelta(days=6)
+
+# 打印結果
+print(f"本週：{current_week_start.strftime('%Y/%m/%d')}~{current_week_end.strftime('%Y/%m/%d')}，週數：{week_str}")
+
+def find_folder(folder_name, path='.'):
+    for root, dirs, files in os.walk(path):
+        if folder_name in dirs:
+            return os.path.join(root, folder_name)
+    return None
+
+# 獲取當前日期所在的周
+now = datetime.datetime.now()
+current_week = isoweek.Week.withdate(now).week
+
+# 計算上一週的週數
+previous_week = current_week - 1
+previous_week_str = f"W{previous_week:02d}"
+
+def clear_contents(worksheet, range_str):
+    cell_range = worksheet.range(range_str)
+    cell_range.value = None
+
+# 檢查上一週的文件夾是否存在於找到的文件夾中
+if target_folder:
+    previous_week_folder = find_folder(previous_week_str, target_folder)
+    if previous_week_folder:
+        print(f"找到了上一週（{previous_week_str}）的文件夾: {previous_week_folder}")
+
+        # 搜尋檔名包含"Weekly review-Cypress-"的.xlsx檔案
+        xlsx_files = glob.glob(os.path.join(previous_week_folder, "Weekly review-Cypress-*.xlsx"))
+
+        if xlsx_files:
+            print(f"找到了檔名包含'Weekly review-Cypress-'的.xlsx檔案: {', '.join(xlsx_files)}")
+            # 打開找到的.xlsx檔案
+            for xlsx_file in xlsx_files:
+                wb = xw.Book(xlsx_file)
+                try:
+                    iqc_all_sheet = wb.sheets["IQC-All"]
+                    clear_contents(iqc_all_sheet, "A1:Y1048576")  # 以最大行數作為清除範圍
+                    print("IQC-All工作表初始化成功")
+                except KeyError:
+                    print("IQC-All工作表初始化失敗")
+
+                try:
+                    oqc_avi_sheet = wb.sheets["OQC_AVI"]
+                    clear_contents(oqc_avi_sheet, "F2:J502")
+                    clear_contents(oqc_avi_sheet, "A609:Y884")
+                    print("OQC_AVI工作表初始化成功")
+                except KeyError:
+                    print("OQC_AVI工作表初始化失敗")
+
+                wb.save(xlsx_file)
+#                wb.close()  # 關閉工作簿
+                os.startfile(xlsx_file)
+
+        else:
+            print("沒有找到檔名包含'Weekly review-Cypress-'的.xlsx檔案。")
+    else:
+        print("沒有找到當週週報的文件夾，請確認是否已經複製新的文件夾路徑。")
+else:
+    print("請檢查文件夾中是否有正確年份的IFX weekly report文件夾")
+
+source_folder = "H:\資料備份區\自動化下載資料暫存區"
+source_file_pattern = "540 IQC output(供月報使用)*.xlsx"
+
+source_files = glob.glob(os.path.join(source_folder, source_file_pattern))
+if source_files:
+    source_file = source_files[0]  # 選擇找到的第一個檔案
+    print(f"找到檔名為'540 IQC output(供月報使用)'的.xlsx檔案: {source_file}")
+
+    source_wb = xw.Book(source_file)
+    source_sheet = source_wb.sheets[0]  # 假設所需資料在第一個工作表
+    data_to_copy = source_sheet.range("A1:Y1048576").value
+
+    # 將資料複製到所有找到的xlsx_files中的IQC-All工作表的A1儲存格中
+    for xlsx_file in xlsx_files:
+        wb = xw.Book(xlsx_file)
+        try:
+            iqc_all_sheet = wb.sheets["IQC-All"]
+            iqc_all_sheet.range("A1").value = data_to_copy
+            print(f"已將資料複製到 {xlsx_file} 的IQC-All工作表中")
+        except KeyError:
+            print(f"未能複製資料到 {xlsx_file} 的IQC-All工作表中")
+
+        wb.save(xlsx_file)
+        wb.close()
+
+#    source_wb.close()  # 關閉來源檔案
+
+else:
+    print("未找到檔名為'540 IQC output(供月報使用)'的.xlsx檔案。")
+
+source_folder = "H:\資料備份區\自動化下載資料暫存區"
+source_file_pattern = "540 AVI output(供月報使用)*.xlsx"
+
+source_files = glob.glob(os.path.join(source_folder, source_file_pattern))
+if source_files:
+    source_file = source_files[0]  # 選擇找到的第一個檔案
+    print(f"找到檔名為'540 AVI output(供月報使用)'的.xlsx檔案: {source_file}")
+
+    source_wb = xw.Book(source_file)
+    source_sheet = source_wb.sheets[0]  # 假設所需資料在第一個工作表
+    data_to_copy = source_sheet.range("A1:Y600000").value
+
+    # 將資料複製到所有找到的xlsx_files中的IQC-All工作表的A1儲存格中
+    for xlsx_file in xlsx_files:
+        wb = xw.Book(xlsx_file)
+        try:
+            iqc_all_sheet = wb.sheets["OQC_AVI"]
+            iqc_all_sheet.range("A132").value = data_to_copy
+            print(f"已將資料複製到 {xlsx_file} 的OQC_AVI工作表中")
+        except KeyError:
+            print(f"未能複製資料到 {xlsx_file} 的OQC_AVI工作表中")
+
+        wb.save(xlsx_file)
+        wb.close()
+
+    source_wb.close()  # 關閉來源檔案
+
+else:
+    print("未找到檔名為'540 AVI output(供月報使用)'的.xlsx檔案。")
+
+source_wb.close()
+wb.close()
