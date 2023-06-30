@@ -1,0 +1,99 @@
+if __name__ == '__main__':
+    from selenium import webdriver
+    from selenium.webdriver.edge.options import Options
+    import time
+    import pyautogui
+    import os
+    import datetime
+
+    # 要刪除的目錄路徑
+    dir_path = r'C:\Users\A005772\Downloads'
+
+    # 列出目錄中的所有檔案
+    files = os.listdir(dir_path)
+
+    # 刪除每個檔案
+    for file in files:
+        file_path = os.path.join(dir_path, file)
+        os.remove(file_path)
+
+    # 引入time模組，等待使用
+    import time
+
+    # 建立Edge瀏覽器的options並加入參數，這裡是禁止瀏覽器彈出通知
+    options = Options()
+    options.add_argument("--disable-notifications")
+
+    # 創建Edge瀏覽器物件，需要指定edgedriver執行檔案的路徑和options
+    edge = webdriver.Edge('./edgedriver', options=options)
+
+    # 使用Edge瀏覽器物件的get方法訪問指定的網頁
+    edge.get("http://point/deptsite/Q300/Leader/Forms/AllItems.aspx")
+
+    # 將Edge瀏覽器視窗最大化
+    edge.maximize_window()
+
+    # 等待網頁載入完成
+    time.sleep(3)
+
+    # 將鼠標移動至指定位置
+    pyautogui.moveTo(592, 589)
+
+    # 點選滑鼠右鍵
+    pyautogui.rightClick()
+
+    # 將鼠標移動至指定位置
+    pyautogui.moveTo(619, 733)
+
+    # 點選滑鼠右鍵
+    pyautogui.leftClick()
+
+# 設定起始時間
+start_time = time.time()
+
+# 等待直到54行以前的code全部執行完成
+while time.time() - start_time < 30:
+    continue
+
+# 設定下載目錄路徑
+download_dir = 'C:\\Users\\A005772\\Downloads'
+
+# 檢查下載目錄中是否有符合檔名的檔案
+found_file = False
+for filename in os.listdir(download_dir):
+    if '客戶代判權限表' in filename:
+        found_file = True
+        break
+
+# 刪除下載的檔案
+if not found_file:
+    for filename in os.listdir(download_dir):
+        full_path = os.path.join(download_dir, filename)
+        if os.path.isfile(full_path):
+            os.remove(full_path)
+
+# 要修改的目錄路徑
+dir_path = r'C:\Users\A005772\Downloads'
+
+# 計算當前系統日期並格式化為指定格式
+today = datetime.datetime.today()
+date_str = today.strftime('%m%d')
+
+# 列出目錄中的所有檔案
+files = os.listdir(dir_path)
+
+# 將每個檔案名稱加上日期並重新命名
+for file in files:
+    # 檢查檔案是否是檔案 (不是目錄)
+    if os.path.isfile(os.path.join(dir_path, file)):
+        # 拆分檔案名稱和檔案副檔名
+        name, ext = os.path.splitext(file)
+        # 加上日期到檔案名稱
+        new_name = f'{name}_{date_str}{ext}'
+        # 重命名檔案
+        os.rename(os.path.join(dir_path, file), os.path.join(dir_path, new_name))
+
+# ...
+
+# 關閉瀏覽器
+edge.quit()
