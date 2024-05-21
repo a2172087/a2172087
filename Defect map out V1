@@ -1,0 +1,120 @@
+import os
+import sys
+import re
+from PyQt5.QtGui import QFont, QIcon, QIntValidator
+from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLineEdit, QFileDialog, QVBoxLayout, QLabel, QMessageBox, QDesktopWidget
+import qtmodern.styles
+import qtmodern.windows
+
+def get_application_path():
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
+def set_app_style(app):
+    font = QFont("微軟正黑體", 9)
+    app.setFont(font)
+    qtmodern.styles.dark(app)
+
+class ImageClassifier(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle('Defect map out ')
+        self.resize(400, 200)  # 設定視窗大小
+        self.center()
+        self.init_ui()
+
+    def center(self):
+        frame_geometry = self.frameGeometry()
+        center_point = QDesktopWidget().screenGeometry().center()
+        frame_geometry.moveCenter(center_point)
+        self.move(frame_geometry.topLeft())
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+
+        self.folder_label = QLabel("請選擇要Map out的資料路徑")
+        layout.addWidget(self.folder_label)
+
+        self.folder_button = QPushButton("選擇資料夾")
+        self.folder_button.clicked.connect(self.select_folder)
+        layout.addWidget(self.folder_button)
+
+        self.input_label = QLabel("請輸入Defect code")
+        layout.addWidget(self.input_label)
+
+        self.input_box = QLineEdit()
+        self.input_box.setValidator(QIntValidator())
+        layout.addWidget(self.input_box)
+
+        self.execute_button = QPushButton("執行")
+        self.execute_button.clicked.connect(self.execute)
+        layout.addWidget(self.execute_button)
+
+        self.setLayout(layout)
+
+    def select_folder(self):
+        self.folder_path = QFileDialog.getExistingDirectory(self, "選擇資料夾")
+        if self.folder_path:
+            self.folder_label.setText(f"選擇的資料夾路徑: {self.folder_path}")
+
+    def extract_xy_points(self, folder_path):
+        xy_points = []
+        for filename in os.listdir(folder_path):
+            if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                if "-" in filename:
+                    match = re.search(r'-\d+_(\d+)_(\d+)_', filename)
+                else:
+                    match = re.search(r'[^_]*_[^_]*_([0-9]+)_([0-9]+)_', filename)
+                if not match:
+                    match = re.search(r'[^_]*_([0-9]+)_([0-9]+)_', filename)
+                if match:
+                    try:
+                        x_point = int(match.group(1))
+                        y_point = int(match.group(2))
+                    except ValueError:
+                        raise ValueError(f"Invalid x_point or y_point in file name: {filename}")
+                    xy_points.append((x_point, y_point))
+                else:
+                    raise ValueError(f"Pattern not matched in file name: {filename}")
+        return xy_points
+
+    def execute(self):
+        if not hasattr(self, 'folder_path'):
+            QMessageBox.warning(self, "錯誤", "請先選擇資料夾")
+            return
+
+        user_defect_number = self.input_box.text()
+        if not user_defect_number:
+            QMessageBox.warning(self, "錯誤", "請輸入defect number")
+            return
+
+        try:
+            xy_points = self.extract_xy_points(self.folder_path)
+        except ValueError as e:
+            QMessageBox.warning(self, "錯誤", str(e))
+            return
+
+        output_lines = [f"{x},{y},{user_defect_number}" for x, y in xy_points]
+        output_text = "\n".join(output_lines)
+
+        download_folder = os.path.expanduser("~/Downloads")
+        output_file = os.path.join(download_folder, "Defect map out list.txt")
+        with open(output_file, "w") as file:
+            file.write(output_text)
+
+        os.startfile(download_folder)
+        QApplication.quit()
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    #sys.stdout.reconfigure(encoding='utf-8')
+    application_path = get_application_path()
+    icon_path = os.path.join(application_path, 'format.ico')
+    app.setWindowIcon(QIcon(icon_path))
+    set_app_style(app)
+    window = ImageClassifier()
+    win = qtmodern.windows.ModernWindow(window)
+    win.show()
+    sys.exit(app.exec_())
