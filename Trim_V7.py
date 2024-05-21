@@ -70,6 +70,14 @@ class ResizeThread(QThread):
         hours, rem = divmod(remaining_time, 3600)
         minutes, seconds = divmod(rem, 60)
         self.remaining_time.emit(f"預估剩餘時間: {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}")
+        
+if getattr(sys, 'frozen', False):
+    application_path = sys._MEIPASS
+else:
+    application_path = os.path.dirname(os.path.abspath(__file__))
+
+icon_path = os.path.join(application_path, 'format.ico')
+
 
 class Application(QWidget):
     def __init__(self):
@@ -79,7 +87,7 @@ class Application(QWidget):
         self.base_dir_enabled = True
 
         self.setWindowTitle('Trim')
-        app.setWindowIcon(QtGui.QIcon('crop.ico'))
+        app.setWindowIcon(QIcon(icon_path))
 
         self.folder_entry = QLineEdit()
         self.add_folder_button = QPushButton("新增需裁減的資料夾名稱")
