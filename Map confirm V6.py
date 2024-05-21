@@ -1,64 +1,89 @@
 import os
 import re
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton, QFileDialog, QTextEdit, QLineEdit, QColorDialog, QMessageBox
-from PyQt5.QtGui import QPixmap, QFont, QImage, QPainter, QColor, QPen
-from PyQt5.QtCore import Qt, QRect, QPoint, QTimer
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton, QFileDialog, QLineEdit, QColorDialog, QMessageBox, QCheckBox
+from PyQt5.QtGui import QPixmap, QFont, QImage, QPainter, QColor, QIcon
+from PyQt5.QtCore import Qt, QRect
 import qtmodern.styles
 import qtmodern.windows
-from pathlib import Path
-from PyQt5 import QtGui
 import openpyxl
 from openpyxl.styles import PatternFill
+
+# 判斷是否為打包後的執行檔
+if getattr(sys, 'frozen', False):
+    application_path = sys._MEIPASS
+else:
+    application_path = os.path.dirname(os.path.abspath(__file__))
+
+# 設定圖示路徑
+icon_path = os.path.join(application_path, 'format.ico')
 
 class ImageClassifier(QWidget):
     def __init__(self):
         super().__init__()
 
+        # 設定視窗標題和圖示
         self.setWindowTitle('Map Confirm')
-        app.setWindowIcon(QtGui.QIcon('a8oad.ico'))
+        app.setWindowIcon(QIcon(icon_path))
         self.resize(800, 600)
         
+        # 建立導入MAP圖按鈕
         self.importBtn = QPushButton('導入MAP圖', self)
         self.importBtn.clicked.connect(self.importMap)
         
+        # 建立選擇確認照片資料夾按鈕
         self.confirmPathBtn = QPushButton('選擇確認照片的資料夾', self)
         self.confirmPathBtn.clicked.connect(self.selectConfirmPath)
         
+        # 建立執行按鈕
         self.runSaveBtn = QPushButton('執行', self)
         self.runSaveBtn.clicked.connect(self.executeSave)
 
+        # 建立另存新檔按鈕
         self.runSaveAsBtn = QPushButton('另存新檔', self)
         self.runSaveAsBtn.clicked.connect(self.executeSaveAs)
         
+        # 建立設定填充顏色按鈕
         self.colorBtn = QPushButton('設定填充顏色', self)
         self.colorBtn.clicked.connect(self.setFillColor)
+
+        # 建立不要覆蓋已存在的Issue code的複選框
+        self.overwriteCheckBox = QCheckBox('不要覆蓋已存在的Issue code', self)
+        self.overwriteCheckBox.setChecked(True)
         
+        # 建立MAP檔案路徑標籤
         self.pathLabel = QLineEdit(self)
         self.pathLabel.hide()
         
+        # 建立確認照片資料夾路徑標籤
         self.confirmPathLabel = QLineEdit(self)
         self.confirmPathLabel.hide()
         
+        # 建立圖片標籤
         self.imageLabel = QLabel(self)
         
+        # 設定預設的填充顏色
         self.start_color = "bc8f8f"
         self.end_color = "bc8f8f"
         
+        # 建立佈局並將元件加入佈局
         layout = QVBoxLayout()
         layout.addWidget(self.importBtn)
         layout.addWidget(self.pathLabel)
         layout.addWidget(self.confirmPathBtn)
         layout.addWidget(self.confirmPathLabel)
         layout.addWidget(self.colorBtn)
-        layout.addWidget(self.runSaveAsBtn)  # Move the runSaveAsBtn before the runSaveBtn
+        layout.addWidget(self.overwriteCheckBox)
+        layout.addWidget(self.runSaveAsBtn)
         layout.addWidget(self.runSaveBtn)
         layout.addWidget(self.imageLabel)
         self.setLayout(layout)
         
+        # 檢查是否顯示執行按鈕
         self.checkShowRunButton()
         
     def importMap(self):
+        # 開啟檔案對話框選擇MAP檔案
         path, _ = QFileDialog.getOpenFileName(self, '選擇MAP檔案', filter="Excel files (*.xlsx)")
         if path:
             self.pathLabel.setText(path)
@@ -67,6 +92,7 @@ class ImageClassifier(QWidget):
             self.checkShowRunButton()
     
     def selectConfirmPath(self):
+        # 開啟資料夾對話框選擇確認照片的資料夾
         folder_path = QFileDialog.getExistingDirectory(self, '選擇確認照片的資料夾')
         if folder_path:
             self.confirmPathLabel.setText(folder_path)
@@ -74,6 +100,7 @@ class ImageClassifier(QWidget):
             self.checkShowRunButton()
 
     def checkShowRunButton(self):
+        # 檢查是否顯示執行按鈕
         if self.pathLabel.text() and self.confirmPathLabel.text():
             self.runSaveBtn.show()
             self.runSaveAsBtn.show()
@@ -82,6 +109,7 @@ class ImageClassifier(QWidget):
             self.runSaveAsBtn.hide()
 
     def setFillColor(self):
+        # 設定填充顏色
         color = QColorDialog.getColor()
         if color.isValid():
             rgb_color = f'{color.red():02X}{color.green():02X}{color.blue():02X}'
@@ -89,22 +117,24 @@ class ImageClassifier(QWidget):
             self.end_color = rgb_color
 
     def executeSave(self):
+        # 執行儲存
         self.executeCore(self.pathLabel.text())
 
     def executeSaveAs(self):
+        # 另存新檔
         save_path, _ = QFileDialog.getSaveFileName(self, '另存新檔', filter="Excel files (*.xlsx)")
         if save_path:
-            # Load the current workbook and save it as a new file without modification.
+            # 載入目前的工作簿並另存為新檔案，不做任何修改
             workbook = openpyxl.load_workbook(self.pathLabel.text())
             workbook.save(save_path)
             workbook.close()
             
-            # Update the main file path label to reflect the new file location, without changing the confirm path
+            # 更新主檔案路徑標籤以反映新的檔案位置，不改變確認路徑
             self.pathLabel.setText(save_path)
-            self.displayMap(save_path)  # Optional: display the map from the new file path
-
+            self.displayMap(save_path)  # 可選：顯示新檔案路徑的地圖
 
     def executeCore(self, save_path):
+        # 執行核心功能
         confirm_folder_path = self.confirmPathLabel.text()
         if os.path.exists(confirm_folder_path):
             xy_points = self.extract_xy_points(confirm_folder_path)
@@ -119,7 +149,8 @@ class ImageClassifier(QWidget):
                     y_point = int(y_point)
                     if x_point >= 1 and y_point >= 1:
                         cell = worksheet.cell(row=y_point, column=x_point)
-                        cell.fill = PatternFill(start_color=self.start_color, end_color=self.end_color, fill_type="solid")
+                        if not self.overwriteCheckBox.isChecked() or cell.value is None:
+                            cell.fill = PatternFill(start_color=self.start_color, end_color=self.end_color, fill_type="solid")
                 except ValueError:
                     pass
 
@@ -128,18 +159,18 @@ class ImageClassifier(QWidget):
 
             self.displayMap(save_path)
 
-
     def extract_xy_points(self, folder_path):
+        # 從照片檔名提取XY座標
         xy_points = []
         for filename in os.listdir(folder_path):
             if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
-                # Existing patterns
+                # 現有的模式
                 if "-" in filename:
                     match = re.search(r'-\d+_(\d+)_(\d+)_', filename)
                 else:
                     match = re.search(r'[^_]*_[^_]*_([0-9]+)_([0-9]+)_', filename)
 
-                # New pattern for filenames like "KK4QR07_2_8_Un-reviewed_1.jpg"
+                # 新的模式，用於像是 "KK4QR07_2_8_Un-reviewed_1.jpg" 這樣的檔名
                 if not match:
                     match = re.search(r'[^_]*_([0-9]+)_([0-9]+)_', filename)
 
@@ -148,15 +179,16 @@ class ImageClassifier(QWidget):
                         x_point = int(match.group(1))
                         y_point = int(match.group(2))
                     except ValueError:
-                        raise ValueError(f"Invalid x_point or y_point in file name: {filename}")
+                        raise ValueError(f"檔名中的 x_point 或 y_point 無效: {filename}")
 
                     xy_points.append((x_point, y_point))
                 else:
-                    raise ValueError(f"Pattern not matched in file name: {filename}")
+                    raise ValueError(f"檔名不符合模式: {filename}")
 
         return xy_points
 
     def get_fill_color(self, cell):
+        # 獲取儲存格的填充顏色
         fill = cell.fill
         if fill.fill_type == "solid" and hasattr(fill.start_color, 'rgb'):
             try:
@@ -167,8 +199,8 @@ class ImageClassifier(QWidget):
         else:
             return None
 
-
     def displayMap(self, excel_path):
+        # 顯示地圖
         try:
             workbook = openpyxl.load_workbook(excel_path, data_only=True)
             worksheet = workbook.active
@@ -188,7 +220,7 @@ class ImageClassifier(QWidget):
         # 在找到的最後一欄有值的位置後再往右增加一欄
         end_col += 1
 
-        # Dictionary to store color counts
+        # 儲存顏色計數的字典
         color_counts = {}
 
         if end_col >= start_col:
@@ -216,8 +248,8 @@ class ImageClassifier(QWidget):
                     fill_color = self.get_fill_color(cell)
                     if fill_color:
                         painter.fillRect(cell_rect, fill_color)  # 使用填充顏色填充矩形
-                        # Count the colors
-                        color_hex = fill_color.name()[1:]  # Convert QColor to hex string without '#'
+                        # 計算顏色出現的次數
+                        color_hex = fill_color.name()[1:]  # 將QColor轉換為不帶'#'的十六進制字串
                         color_counts[color_hex] = color_counts.get(color_hex, 0) + 1
                     
                     painter.drawRect(cell_rect)
@@ -226,10 +258,6 @@ class ImageClassifier(QWidget):
             
             painter.end()
             
-            # 顯示圖片
-            #pixmap = QPixmap.fromImage(image)
-            #self.imageLabel.setPixmap(pixmap)
-            #self.imageLabel.setAlignment(Qt.AlignCenter)
             # 顯示圖片
             pixmap = QPixmap.fromImage(image)
             self.imageLabel.setPixmap(pixmap)
