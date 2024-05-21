@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QPushButton, QFileDialog, QInputDialog, QVBoxLayout, QHBoxLayout, QSizePolicy, QGridLayout, QMessageBox
-from PyQt5.QtGui import QPixmap, QFont, QImage, QPainter, QColor, QPen
+from PyQt5.QtGui import QPixmap, QFont, QImage, QPainter, QColor, QPen, QIcon
 from PyQt5.QtCore import Qt, QPoint, QTimer, QSize
 from pathlib import Path
 from PyQt5 import QtGui
@@ -9,12 +9,19 @@ import sys
 import qtmodern.styles
 import qtmodern.windows
 
+if getattr(sys, 'frozen', False):
+    application_path = sys._MEIPASS
+else:
+    application_path = os.path.dirname(os.path.abspath(__file__))
+
+icon_path = os.path.join(application_path, 'format.ico')
+
 class ImageClassifier(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
         self.setWindowTitle('Classify')
-        app.setWindowIcon(QtGui.QIcon('icon_result.ico'))
+        app.setWindowIcon(QIcon(icon_path))
 
     def initUI(self):
         main_layout = QHBoxLayout(self)
