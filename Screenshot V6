@@ -1,7 +1,0 @@
-import os
-
-def start_snip_sketch():
-    # 直接執行命令來啟動 Snip & Sketch
-    os.system('explorer ms-screenclip:')
-
-start_snip_sketch()
